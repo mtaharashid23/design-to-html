@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design to HTML — Gemini AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        :root{
+            --bg:#0d0d0f;--bg2:#141416;--bg3:#1c1c20;
+            --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+            --text:#efefef;--text2:#777;
+            --accent:#4f8ef7;--accent2:#7eb3f9;
+            --success:#3ecf8e;--error:#f87171;
+            --sans:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+        }
+        body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+
+        /* HEADER */
+        .header{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+        .header h1{font-size:19px;font-weight:600;letter-spacing:-.4px;background:linear-gradient(120deg,#fff 30%,var(--accent2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .header p{font-size:11px;color:var(--text2);margin-top:2px}
+        .api-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .api-row label{font-size:11px;color:var(--text2);white-space:nowrap}
+        .api-input{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none;width:240px;transition:border-color .15s}
+        .api-input:focus{border-color:var(--accent)}
+        .api-input::placeholder{color:var(--text2)}
+        .save-btn{padding:7px 14px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+        .save-btn:hover{background:var(--accent2)}
+        .key-status{font-size:11px;padding:4px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+        .key-status.ok{background:rgba(62,207,142,.1);color:var(--success);border:1px solid rgba(62,207,142,.2)}
+        .key-status.no{background:rgba(248,113,113,.1);color:var(--error);border:1px solid rgba(248,113,113,.2)}
+        .key-status::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+
+        /* LAYOUT */
+        .layout{display:grid;grid-template-columns:350px 1fr;height:calc(100vh - 69px);overflow:hidden}
+
+        /* LEFT */
+        .left{border-right:1px solid var(--border);padding:22px;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+        .drop-zone{border:2px dashed var(--border2);border-radius:14px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg2)}
+        .drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:rgba(79,142,247,.05)}
+        .drop-zone.over{transform:scale(1.01)}
+        .drop-icon{font-size:32px;margin-bottom:8px}
+        .drop-zone h3{font-size:14px;font-weight:500;margin-bottom:3px}
+        .drop-zone p{font-size:11px;color:var(--text2)}
+        .browse-btn{margin-top:10px;padding:6px 16px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);transition:all .15s;display:inline-block}
+        .browse-btn:hover{background:var(--accent2)}
+        #fileInput{display:none}
+        .img-preview{display:none;border-radius:10px;overflow:hidden;border:1px solid var(--border2);position:relative}
+        .img-preview img{width:100%;max-height:180px;object-fit:cover;display:block}
+        .img-overlay{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:16px 10px 8px;display:flex;align-items:center;justify-content:space-between}
+        .img-name{font-size:10px;color:rgba(255,255,255,.7);font-family:var(--mono)}
+        .change-btn{font-size:10px;color:rgba(255,255,255,.8);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:5px;padding:3px 8px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+        .change-btn:hover{background:rgba(255,255,255,.2)}
+        .sec-label{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+        .prompt-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--text);font-family:var(--sans);resize:vertical;min-height:75px;outline:none;transition:border-color .15s}
+        .prompt-input:focus{border-color:var(--accent)}
+        .prompt-input::placeholder{color:var(--text2);font-size:11px}
+        .fmt-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+        .fmt-opt{padding:7px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;font-size:11px;cursor:pointer;transition:all .15s;text-align:center}
+        .fmt-opt.sel{border-color:var(--accent);background:rgba(79,142,247,.1);color:var(--accent2)}
+        .gen-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),#6fa8f7);color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .2s;letter-spacing:.2px}
+        .gen-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(79,142,247,.3)}
+        .gen-btn:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+        .how-to{padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;font-size:11px;color:var(--text2);line-height:1.8}
+        .how-to strong{color:var(--text);display:block;margin-bottom:3px}
+        .how-to a{color:var(--accent2)}
+        .gemini-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;background:rgba(66,133,244,.12);border:1px solid rgba(66,133,244,.2);border-radius:20px;font-size:10px;color:#7eb3f9;margin-bottom:4px}
+
+        /* RIGHT */
+        .right{display:flex;flex-direction:column;overflow:hidden}
+        .empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text2)}
+        .empty-icon{font-size:44px;margin-bottom:4px;opacity:.4}
+        .empty-state h3{font-size:14px;font-weight:500;color:var(--text);opacity:.4}
+        .empty-state p{font-size:12px;opacity:.5}
+
+        /* LOADING */
+        .loading{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+        .spin{width:38px;height:38px;border:2.5px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .75s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .loading h3{font-size:14px;font-weight:500}
+        .loading p{font-size:11px;color:var(--text2);text-align:center;max-width:260px}
+        .steps{display:flex;flex-direction:column;gap:7px;width:250px}
+        .step{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);transition:all .3s}
+        .step.active{color:var(--text)}
+        .step.done{color:var(--success)}
+        .step-dot{width:5px;height:5px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:all .3s}
+        .step.active .step-dot{background:var(--accent);box-shadow:0 0 5px var(--accent)}
+        .step.done .step-dot{background:var(--success)}
+        .prog-wrap{width:250px;height:2px;background:var(--bg3);border-radius:2px;overflow:hidden}
+        .prog-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;width:0%;transition:width .5s ease}
+
+        /* TABS */
+        .tabs-row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);gap:3px;flex-shrink:0}
+        .tab{padding:5px 12px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;border:none;font-family:var(--sans);background:transparent;color:var(--text2);transition:all .15s}
+        .tab:hover{background:var(--bg3);color:var(--text)}
+        .tab.on{background:var(--accent);color:#fff}
+        .tab-actions{margin-left:auto;display:flex;gap:7px}
+        .act-btn{display:flex;align-items:center;gap:5px;padding:5px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;font-size:11px;font-weight:500;color:var(--text2);cursor:pointer;font-family:var(--sans);transition:all .15s}
+        .act-btn:hover{border-color:var(--border2);color:var(--text)}
+        .act-btn.prime{background:var(--accent);color:#fff;border-color:transparent}
+        .act-btn.prime:hover{background:var(--accent2)}
+        .output{display:none;flex-direction:column;flex:1;overflow:hidden}
+        .pane{display:none;flex:1;overflow:auto}
+        .pane.on{display:flex;flex-direction:column}
+        iframe#preview{flex:1;border:none;background:white}
+        .code-view{flex:1;font-family:var(--mono);font-size:12px;line-height:1.75;color:#cdd9e5;background:var(--bg);padding:20px 24px;overflow:auto;white-space:pre;tab-size:2}
+        .foot-note{padding:9px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text2);background:var(--bg2);display:flex;align-items:center;gap:6px;flex-shrink:0}
+        .foot-note span{color:var(--accent2);font-weight:500}
+
+        /* TOAST */
+        .toast{position:fixed;bottom:18px;right:18px;padding:10px 15px;border-radius:8px;font-size:12px;font-weight:500;z-index:999;display:none;animation:slideUp .25s ease;max-width:300px}
+        @keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .toast.err{background:#2a1218;border:1px solid rgba(248,113,113,.3);color:var(--error)}
+        .toast.ok{background:#0c1f18;border:1px solid rgba(62,207,142,.25);color:var(--success)}
+
+        @media(max-width:780px){
+            .layout{grid-template-columns:1fr;height:auto}
+            .left{border-right:none;border-bottom:1px solid var(--border)}
+            .right{height:80vh}
+            .api-input{width:160px}
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <div class="gemini-badge">⚡ Google Gemini 2.0 Flash — Free API</div>
+        <h1>Design → HTML Converter</h1>
+        <p>Upload any design screenshot — get production-ready PHP boilerplate code instantly</p>
+    </div>
+    <div class="api-row">
+        <label>Gemini API Key:</label>
+        <input type="password" class="api-input" id="apiKeyInput" placeholder="AIzaSy...">
+        <button class="save-btn" onclick="saveKey()">Save</button>
+        <span class="key-status no" id="keyStatus">No key</span>
+    </div>
+</div>
+
+<div class="layout">
+    <div class="left">
+
+        <div id="dropZone" class="drop-zone">
+            <div class="drop-icon">🖼️</div>
+            <h3>Drop your design here</h3>
+            <p>PNG, JPG, WEBP — max 5MB</p>
+            <button class="browse-btn" onclick="event.stopPropagation();document.getElementById('fileInput').click()">Browse File</button>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div id="imgPreview" class="img-preview">
+            <img id="previewImg" src="" alt="Design">
+            <div class="img-overlay">
+                <span class="img-name" id="imgNameLabel"></span>
+                <button class="change-btn" onclick="document.getElementById('fileInput').click()">↺ Change</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="sec-label">Output Format</div>
+            <div class="fmt-grid">
+                <div class="fmt-opt sel" data-fmt="boilerplate" onclick="selFmt(this)">📦 PHP Boilerplate</div>
+                <div class="fmt-opt" data-fmt="plain" onclick="selFmt(this)">📄 Plain HTML</div>
+            </div>
+        </div>
+
+        <div>
+            <div class="sec-label">Extra Instructions (optional)</div>
+            <textarea class="prompt-input" id="extraPrompt" placeholder="e.g. dark theme, add hover animations, use card grid, Tailwind classes..."></textarea>
+        </div>
+
+        <button class="gen-btn" id="genBtn" disabled onclick="startGenerate()">✦ Generate HTML Code</button>
+
+        <div class="how-to">
+            <strong>🔑 Free API key kaise milegi:</strong>
+            1. Jao <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a><br>
+            2. "Create API key" click karo<br>
+            3. Key copy karo — bilkul free hai, card nahi chahiye<br>
+            4. Upar paste karo aur Save karo
+        </div>
+
+    </div>
+
+    <div class="right" id="rightPanel">
+
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">⚡</div>
+            <h3>Ready to convert</h3>
+            <p>Upload design + API key → Generate</p>
+            <p style="font-size:10px;margin-top:2px;opacity:.4">Gemini 2.0 Flash reads the image — real code, not templates</p>
+        </div>
+
+        <div class="loading" id="loadingState">
+            <div class="spin"></div>
+            <h3>Analyzing design…</h3>
+            <div class="prog-wrap"><div class="prog-bar" id="progBar"></div></div>
+            <div class="steps">
+                <div class="step active" id="s1"><div class="step-dot"></div>Sending image to Gemini Vision</div>
+                <div class="step" id="s2"><div class="step-dot"></div>Identifying layout & components</div>
+                <div class="step" id="s3"><div class="step-dot"></div>Generating HTML structure</div>
+                <div class="step" id="s4"><div class="step-dot"></div>Writing CSS styles</div>
+                <div class="step" id="s5"><div class="step-dot"></div>Packaging boilerplate output</div>
+            </div>
+            <p>Usually 15–25 seconds…</p>
+        </div>
+
+        <div class="output" id="outputPanel">
+            <div class="tabs-row">
+                <button class="tab on" data-tab="preview" onclick="switchTab(this)">👁 Preview</button>
+                <button class="tab" data-tab="html" onclick="switchTab(this)">index.php</button>
+                <button class="tab" data-tab="css" onclick="switchTab(this)">custom.css</button>
+                <button class="tab" data-tab="js" onclick="switchTab(this)">custom.js</button>
+                <div class="tab-actions">
+                    <button class="act-btn" onclick="copyActive()">⊕ Copy</button>
+                    <button class="act-btn prime" onclick="downloadZip()">↓ ZIP</button>
+                </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+                <div class="pane on" id="pane-preview"><iframe id="preview"></iframe></div>
+                <div class="pane" id="pane-html"><div class="code-view" id="codeHtml"></div></div>
+                <div class="pane" id="pane-css"><div class="code-view" id="codeCss"></div></div>
+                <div class="pane" id="pane-js"><div class="code-view" id="codeJs"></div></div>
+            </div>
+            <div class="foot-note">📦 Boilerplate: <span>Bootstrap 5 · GSAP · Lenis · Swiper · PHP includes</span></div>
+        </div>
+
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let apiKey = localStorage.getItem('dth_gemini_key') || '';
+let imgBase64 = null, imgType = null, outputFmt = 'boilerplate', activeTab = 'preview';
+let files = {html:'',css:'',js:''};
+let stepTimer = null;
+
+if(apiKey){ document.getElementById('apiKeyInput').value = apiKey; setKeyStatus(true); }
+
+function saveKey(){
+    const v = document.getElementById('apiKeyInput').value.trim();
+    if(!v || v.length < 10) return toast('Invalid API key','err');
+    apiKey = v;
+    localStorage.setItem('dth_gemini_key', apiKey);
+    setKeyStatus(true);
+    toast('API key saved!','ok');
+    checkBtn();
+}
+
+function setKeyStatus(ok){
+    const el = document.getElementById('keyStatus');
+    el.className = 'key-status '+(ok?'ok':'no');
+    el.textContent = ok ? 'Key saved' : 'No key';
+}
+
+// FILE HANDLING
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('over')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('over'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
+dropZone.addEventListener('click',e=>{if(!e.target.classList.contains('browse-btn'))fileInput.click()});
+fileInput.addEventListener('change',e=>{if(e.target.files[0])loadFile(e.target.files[0])});
+
+function loadFile(file){
+    if(!file.type.startsWith('image/')) return toast('Image file chahiye (PNG/JPG/WEBP)','err');
+    if(file.size > 5*1024*1024) return toast('Max 5MB image size','err');
+    const reader = new FileReader();
+    reader.onload = e=>{
+        const res = e.target.result;
+        imgBase64 = res.split(',')[1];
+        imgType = file.type;
+        document.getElementById('previewImg').src = res;
+        const name = file.name.length>22 ? file.name.slice(0,22)+'…' : file.name;
+        document.getElementById('imgNameLabel').textContent = name;
+        dropZone.style.display = 'none';
+        document.getElementById('imgPreview').style.display = 'block';
+        checkBtn();
+    };
+    reader.readAsDataURL(file);
+}
+
+function checkBtn(){ document.getElementById('genBtn').disabled = !(imgBase64 && apiKey); }
+
+function selFmt(el){
+    document.querySelectorAll('.fmt-opt').forEach(e=>e.classList.remove('sel'));
+    el.classList.add('sel');
+    outputFmt = el.dataset.fmt;
+}
+
+function switchTab(btn){
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab[data-tab]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+    document.getElementById('pane-'+activeTab).classList.add('on');
+}
+
+function copyActive(){
+    const code = activeTab==='css'?files.css:activeTab==='js'?files.js:files.html;
+    if(!code) return toast('Pehle generate karo','err');
+    navigator.clipboard.writeText(code).then(()=>toast('Copied!','ok')).catch(()=>toast('Copy failed','err'));
+}
+
+async function downloadZip(){
+    if(!files.html) return toast('Pehle generate karo','err');
+    const zip = new JSZip();
+    zip.file('index.php', files.html);
+    zip.folder('css').file('custom.min.css', files.css);
+    zip.folder('css').file('responsive.css','/* Responsive overrides */\n');
+    zip.folder('js').file('custom.min.js', files.js);
+    zip.folder('js').file('email-script.js','/* Email script */\n');
+    zip.folder('images');
+    const inc = zip.folder('include');
+    inc.file('header.php','<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title><?php echo isset($title) ? $title : "Home"; ?></title>\n    <?php include "include/css.php"; ?>\n</head>\n<body>');
+    inc.file('footer.php','    <?php include "include/js.php"; ?>\n</body>\n</html>');
+    inc.file('css.php','<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" />\n<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />\n<link rel="stylesheet" href="css/custom.min.css" />\n<link rel="stylesheet" href="css/responsive.css" />');
+    inc.file('js.php','<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"><\/script>\n<script src="https://unpkg.com/lenis@1.1.2/dist/lenis.min.js"><\/script>\n<script src="js/email-script.js"><\/script>\n<script src="js/custom.min.js"><\/script>');
+    const blob = await zip.generateAsync({type:'blob'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download='design-boilerplate.zip'; a.click();
+    URL.revokeObjectURL(url);
+    toast('ZIP downloaded!','ok');
+}
+
+function animateSteps(){
+    ['s1','s2','s3','s4','s5'].forEach(id=>document.getElementById(id).className='step');
+    document.getElementById('s1').className='step active';
+    document.getElementById('progBar').style.width='5%';
+    let i=1;
+    stepTimer = setInterval(()=>{
+        document.getElementById('s'+i).className='step done';
+        i++;
+        if(i<=5){ document.getElementById('s'+i).className='step active'; document.getElementById('progBar').style.width=(i*19)+'%'; }
+        if(i>5) clearInterval(stepTimer);
+    }, 4500);
+}
+
+async function startGenerate(){
+    if(!imgBase64||!apiKey) return;
+    document.getElementById('emptyState').style.display='none';
+    document.getElementById('outputPanel').style.display='none';
+    document.getElementById('loadingState').style.display='flex';
+    document.getElementById('genBtn').disabled=true;
+    animateSteps();
+
+    try{
+        const result = await callGemini();
+        clearInterval(stepTimer);
+        document.getElementById('progBar').style.width='100%';
+        ['s1','s2','s3','s4','s5'].forEach(id=>document.getElementById(id).className='step done');
+        setTimeout(()=>{ document.getElementById('loadingState').style.display='none'; showOutput(result); }, 500);
+    } catch(err){
+        clearInterval(stepTimer);
+        document.getElementById('loadingState').style.display='none';
+        document.getElementById('emptyState').style.display='flex';
+        document.getElementById('genBtn').disabled=false;
+        toast('Error: '+err.message,'err');
+    }
+}
+
+// Models to try in order — if one rate-limits, next one is used
+const MODELS = [
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-pro'
+];
+let currentModelIdx = 0;
+
+function getPromptAndCtx(){
+    const extra = document.getElementById('extraPrompt').value.trim();
+    const boilerplateCtx = outputFmt==='boilerplate' ? `
+OUTPUT FORMAT — PHP BOILERPLATE:
+index.php must:
+- Start with: <?php include 'include/header.php'; ?>
+- End with: <?php include 'include/footer.php'; ?>
+- Use Bootstrap 5 classes (container, row, col-md-*, col-lg-*)
+- Use Font Awesome icons where appropriate
+- NO DOCTYPE, html, head, body, script, or link tags (handled by includes)
+
+css: All custom styles (CSS vars, hover effects, transitions, media queries)
+js: GSAP animations, Lenis smooth scroll init, Swiper init, jQuery interactions`
+    : 'OUTPUT FORMAT: Single complete HTML file with embedded style and script tags.';
+
+    return `You are an expert frontend developer. Analyze this design image precisely and convert it into production-ready code.
+
+${boilerplateCtx}
+${extra ? '\nEXTRA REQUIREMENTS: '+extra : ''}
+
+Analyze carefully:
+- Exact color palette
+- Typography hierarchy (sizes, weights)
+- All visible sections (nav, hero, cards, footer etc.)
+- Grid/layout structure
+- Spacing patterns
+- Icons and visual elements
+- Recreate ALL text content visible in the image
+
+Return ONLY valid JSON, no markdown, no backticks:
+{"html":"...","css":"...","js":"..."}`;
+}
+
+async function callGemini(){
+    const prompt = getPromptAndCtx();
+
+    // Try each model, auto-fallback on rate limit
+    for(let attempt = 0; attempt < MODELS.length; attempt++){
+        const model = MODELS[attempt];
+        updateLoadingMsg(`Using model: ${model}…`);
+
+        try{
+            const result = await tryModel(model, prompt);
+            currentModelIdx = attempt; // remember working model
+            return result;
+        } catch(err){
+            const isRateLimit = err.message.includes('429') || err.message.toLowerCase().includes('rate') || err.message.toLowerCase().includes('quota');
+            if(isRateLimit && attempt < MODELS.length - 1){
+                // Auto-switch to next model after short wait
+                updateLoadingMsg(`Rate limit on ${model}, switching to ${MODELS[attempt+1]}…`);
+                await sleep(2000);
+                continue;
+            }
+            throw err; // non-rate-limit error or last model failed
+        }
+    }
+}
+
+function updateLoadingMsg(msg){
+    const el = document.getElementById('loadingState').querySelector('p');
+    if(el) el.textContent = msg;
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function tryModel(model, prompt){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            contents:[{
+                parts:[
+                    { inline_data: { mime_type: imgType, data: imgBase64 } },
+                    { text: prompt }
+                ]
+            }],
+            generationConfig:{
+                temperature: 0.2,
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json'
+            }
+        })
+    });
+
+    if(!res.ok){
+        let msg = `${res.status}`;
+        try{
+            const e = await res.json();
+            msg = e.error?.message || msg;
+            if(res.status===400) throw new Error('Invalid API key. aistudio.google.com se naya key banao.');
+            if(res.status===403) throw new Error('API key disabled ya invalid hai.');
+            if(res.status===429) throw new Error('429 rate limit on '+model);
+        }catch(e2){ if(e2.message) throw e2; }
+        throw new Error('API error: '+msg);
+    }
+
+    const data = await res.json();
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if(!raw) throw new Error('Empty response. Dobara try karein.');
+
+    let parsed;
+    try{
+        let clean = raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+        const start = clean.indexOf('{');
+        const end = clean.lastIndexOf('}')+1;
+        if(start===-1) throw new Error('No JSON in response');
+        parsed = JSON.parse(clean.slice(start,end));
+    } catch(e){
+        const unescape = s => s ? s.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\\\/g,'\\') : '';
+        const hm = raw.match(/"html"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const cm = raw.match(/"css"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const jm = raw.match(/"js"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        parsed = {
+            html: unescape(hm?.[1]) || '<!-- HTML not generated -->',
+            css: unescape(cm?.[1]) || '/* CSS not generated */',
+            js: unescape(jm?.[1]) || '// JS not generated'
+        };
+    }
+    return parsed;
+}
+
+function showOutput(result){
+    files = result;
+    document.getElementById('codeHtml').textContent = result.html;
+    document.getElementById('codeCss').textContent = result.css;
+    document.getElementById('codeJs').textContent = result.js;
+
+    const previewDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>${result.css}</style>
+</head>
+<body>
+${result.html.replace(/<!--[\s\S]*?-->/g,'').replace(/<\?php[\s\S]*?\?>/g,'').replace(/<\?=[\s\S]*?\?>/g,'')}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"><\/script>
+<script src="https://unpkg.com/lenis@1.1.2/dist/lenis.min.js"><\/script>
+<script>${result.js}<\/script>
+</body>
+</html>`;
+    const blob = new Blob([previewDoc],{type:'text/html'});
+    document.getElementById('preview').src = URL.createObjectURL(blob);
+    document.getElementById('outputPanel').style.display='flex';
+    document.getElementById('genBtn').disabled=false;
+
+    // Reset to preview tab
+    document.querySelectorAll('.tab[data-tab]').forEach(b=>b.classList.remove('on'));
+    document.querySelector('.tab[data-tab="preview"]').classList.add('on');
+    document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+    document.getElementById('pane-preview').classList.add('on');
+    activeTab='preview';
+    toast('Code generate ho gaya! 🎉','ok');
+}
+
+function toast(msg,type='ok'){
+    const el = document.getElementById('toast');
+    el.className='toast '+type;
+    el.textContent=msg;
+    el.style.display='block';
+    clearTimeout(el._t);
+    el._t=setTimeout(()=>{el.style.display='none'},4000);
+}
+
+document.getElementById('apiKeyInput').addEventListener('keydown',e=>{ if(e.key==='Enter') saveKey(); });
+</script>
+</body>
+</html>

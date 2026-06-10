@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design → HTML Converter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0d0d0f;
+            --bg2: #141416;
+            --bg3: #1c1c20;
+            --border: rgba(255,255,255,0.07);
+            --border2: rgba(255,255,255,0.13);
+            --text: #efefef;
+            --text2: #777;
+            --accent: #7c6af7;
+            --accent2: #a08bf5;
+            --success: #3ecf8e;
+            --error: #f87171;
+            --sans: 'DM Sans', sans-serif;
+            --mono: 'DM Mono', monospace;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            padding: 22px 36px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.4px;
+            background: linear-gradient(120deg, #fff 30%, var(--accent2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+        .api-key-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .api-key-wrap label {
+            font-size: 11px;
+            color: var(--text2);
+            white-space: nowrap;
+        }
+        .api-input {
+            background: var(--bg2);
+            border: 1px solid var(--border2);
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 12px;
+            font-family: var(--mono);
+            color: var(--text);
+            outline: none;
+            width: 260px;
+            transition: border-color 0.15s;
+        }
+        .api-input:focus { border-color: var(--accent); }
+        .api-input::placeholder { color: var(--text2); }
+        .api-save-btn {
+            padding: 7px 14px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: var(--sans);
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .api-save-btn:hover { background: var(--accent2); }
+
+        .key-status {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        .key-status.ok { background: rgba(62,207,142,0.1); color: var(--success); border: 1px solid rgba(62,207,142,0.2); }
+        .key-status.no { background: rgba(248,113,113,0.1); color: var(--error); border: 1px solid rgba(248,113,113,0.2); }
+        .key-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+        /* ===== LAYOUT ===== */
+        .layout {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            height: calc(100vh - 73px);
+            overflow: hidden;
+        }
+
+        /* ===== LEFT PANEL ===== */
+        .left {
+            border-right: 1px solid var(--border);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            overflow-y: auto;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border2);
+            border-radius: 14px;
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg2);
+        }
+        .drop-zone:hover, .drop-zone.over {
+            border-color: var(--accent);
+            background: rgba(124,106,247,0.05);
+        }
+        .drop-zone.over { transform: scale(1.01); }
+        .drop-icon { font-size: 36px; margin-bottom: 10px; }
+        .drop-zone h3 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .drop-zone p { font-size: 12px; color: var(--text2); }
+        .browse-btn {
+            margin-top: 12px;
+            padding: 7px 18px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: var(--sans);
+            transition: all 0.15s;
+            display: inline-block;
+        }
+        .browse-btn:hover { background: var(--accent2); }
+        #fileInput { display: none; }
+
+        .img-preview {
+            display: none;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border2);
+            position: relative;
+        }
+        .img-preview img { width: 100%; max-height: 200px; object-fit: cover; display: block; }
+        .img-overlay {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            padding: 20px 12px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .img-name { font-size: 11px; color: rgba(255,255,255,0.7); font-family: var(--mono); }
+        .change-btn {
+            font-size: 11px;
+            color: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-family: var(--sans);
+            transition: all 0.15s;
+        }
+        .change-btn:hover { background: rgba(255,255,255,0.2); }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 6px;
+        }
+
+        .prompt-input {
+            width: 100%;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 13px;
+            font-size: 13px;
+            color: var(--text);
+            font-family: var(--sans);
+            resize: vertical;
+            min-height: 85px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .prompt-input:focus { border-color: var(--accent); }
+        .prompt-input::placeholder { color: var(--text2); font-size: 12px; }
+
+        .output-format {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .format-opt {
+            padding: 8px 12px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .format-opt.selected {
+            border-color: var(--accent);
+            background: rgba(124,106,247,0.1);
+            color: var(--accent2);
+        }
+        .format-opt:hover { border-color: var(--border2); }
+
+        .gen-btn {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--accent), #9b6af7);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--sans);
+            transition: all 0.2s;
+            letter-spacing: 0.2px;
+        }
+        .gen-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,106,247,0.3); }
+        .gen-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* ===== RIGHT PANEL ===== */
+        .right {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: var(--text2);
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 4px; opacity: 0.5; }
+        .empty-state h3 { font-size: 15px; font-weight: 500; color: var(--text); opacity: 0.5; }
+        .empty-state p { font-size: 12px; opacity: 0.6; }
+
+        /* LOADING */
+        .loading {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+        }
+        .spin {
+            width: 40px; height: 40px;
+            border: 2.5px solid var(--border2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading h3 { font-size: 15px; font-weight: 500; }
+        .loading p { font-size: 12px; color: var(--text2); text-align: center; max-width: 280px; }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 260px;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text2);
+            transition: all 0.3s;
+        }
+        .step.active { color: var(--text); }
+        .step.done { color: var(--success); }
+        .step-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--border2);
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+        .step.active .step-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+        .step.done .step-dot { background: var(--success); }
+
+        .prog-wrap {
+            width: 260px; height: 2px;
+            background: var(--bg3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .prog-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* TABS */
+        .tabs-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .tab {
+            padding: 6px 13px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            font-family: var(--sans);
+            background: transparent;
+            color: var(--text2);
+            transition: all 0.15s;
+        }
+        .tab:hover { background: var(--bg3); color: var(--text); }
+        .tab.on { background: var(--accent); color: #fff; }
+
+        .tab-actions { margin-left: auto; display: flex; gap: 8px; }
+        .act-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text2);
+            cursor: pointer;
+            font-family: var(--sans);
+            transition: all 0.15s;
+        }
+        .act-btn:hover { border-color: var(--border2); color: var(--text); }
+        .act-btn.prime { background: var(--accent); color: #fff; border-color: transparent; }
+        .act-btn.prime:hover { background: var(--accent2); }
+
+        /* OUTPUT */
+        .output { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+        .pane { display: none; flex: 1; overflow: auto; }
+        .pane.on { display: flex; flex-direction: column; }
+
+        iframe#preview {
+            flex: 1;
+            border: none;
+            background: white;
+        }
+
+        .code-view {
+            flex: 1;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            line-height: 1.75;
+            color: #cdd9e5;
+            background: var(--bg);
+            padding: 22px 26px;
+            overflow: auto;
+            white-space: pre;
+            tab-size: 2;
+        }
+
+        .footer-note {
+            padding: 10px 18px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text2);
+            background: var(--bg2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .footer-note span { color: var(--accent2); font-weight: 500; }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 20px; right: 20px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 999;
+            display: none;
+            animation: slideUp 0.25s ease;
+            max-width: 320px;
+        }
+        @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .toast.err { background: #2a1218; border: 1px solid rgba(248,113,113,0.3); color: var(--error); }
+        .toast.ok { background: #0c1f18; border: 1px solid rgba(62,207,142,0.25); color: var(--success); }
+
+        @media (max-width: 800px) {
+            .layout { grid-template-columns: 1fr; height: auto; }
+            .left { border-right: none; border-bottom: 1px solid var(--border); }
+            .right { height: 80vh; }
+            .api-input { width: 180px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div>
+        <h1>Design → HTML Converter</h1>
+        <p>Upload any design screenshot — AI generates production-ready PHP boilerplate code</p>
+    </div>
+    <div class="api-key-wrap">
+        <label>Anthropic API Key:</label>
+        <input type="password" class="api-input" id="apiKeyInput" placeholder="sk-ant-api03-...">
+        <button class="api-save-btn" onclick="saveKey()">Save</button>
+        <span class="key-status no" id="keyStatus">No key</span>
+    </div>
+</div>
+
+<div class="layout">
+    <!-- LEFT -->
+    <div class="left">
+
+        <div id="dropZone" class="drop-zone">
+            <div class="drop-icon">🖼️</div>
+            <h3>Drop design image here</h3>
+            <p>PNG, JPG, WEBP — max 5MB</p>
+            <button class="browse-btn" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">Browse File</button>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <div id="imgPreview" class="img-preview">
+            <img id="previewImg" src="" alt="Design">
+            <div class="img-overlay">
+                <span class="img-name" id="imgNameLabel"></span>
+                <button class="change-btn" onclick="document.getElementById('fileInput').click()">↺ Change</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-label">Output Format</div>
+            <div class="output-format">
+                <div class="format-opt selected" data-fmt="boilerplate" onclick="selectFmt(this)">📦 PHP Boilerplate</div>
+                <div class="format-opt" data-fmt="plain" onclick="selectFmt(this)">📄 Plain HTML</div>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-label">Extra Instructions (optional)</div>
+            <textarea class="prompt-input" id="extraPrompt" placeholder="e.g. dark theme, add hover animations, use card grid layout, Tailwind classes..."></textarea>
+        </div>
+
+        <button class="gen-btn" id="genBtn" disabled onclick="startGenerate()">
+            ✦ Generate HTML Code
+        </button>
+
+        <div style="padding: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; font-size: 11.5px; color: var(--text2); line-height: 1.7;">
+            <strong style="color: var(--text); display: block; margin-bottom: 4px;">How to use:</strong>
+            1. Get free API key from <a href="https://console.anthropic.com" target="_blank" style="color: var(--accent2);">console.anthropic.com</a><br>
+            2. Paste key above and click Save<br>
+            3. Upload your design image<br>
+            4. Click Generate — code appears in ~20 sec
+        </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right" id="rightPanel">
+
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">⚡</div>
+            <h3>Ready to convert</h3>
+            <p>Upload a design and click Generate</p>
+            <p style="font-size:11px; margin-top:2px; opacity:0.5;">Claude Vision reads the image — real code, not templates</p>
+        </div>
+
+        <div class="loading" id="loadingState">
+            <div class="spin"></div>
+            <h3>Analyzing design…</h3>
+            <div class="prog-wrap"><div class="prog-bar" id="progBar"></div></div>
+            <div class="steps">
+                <div class="step active" id="s1"><div class="step-dot"></div>Sending image to Claude Vision</div>
+                <div class="step" id="s2"><div class="step-dot"></div>Identifying layout & components</div>
+                <div class="step" id="s3"><div class="step-dot"></div>Generating HTML structure</div>
+                <div class="step" id="s4"><div class="step-dot"></div>Writing CSS styles</div>
+                <div class="step" id="s5"><div class="step-dot"></div>Packaging boilerplate output</div>
+            </div>
+            <p id="loadMsg">Usually takes 20–35 seconds…</p>
+        </div>
+
+        <div class="output" id="outputPanel">
+            <div class="tabs-row">
+                <button class="tab on" data-tab="preview" onclick="switchTab(this)">👁 Preview</button>
+                <button class="tab" data-tab="html" onclick="switchTab(this)">index.php</button>
+                <button class="tab" data-tab="css" onclick="switchTab(this)">custom.css</button>
+                <button class="tab" data-tab="js" onclick="switchTab(this)">custom.js</button>
+                <div class="tab-actions">
+                    <button class="act-btn" onclick="copyActive()">⊕ Copy</button>
+                    <button class="act-btn prime" onclick="downloadZip()">↓ Download ZIP</button>
+                </div>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                <div class="pane on" id="pane-preview"><iframe id="preview"></iframe></div>
+                <div class="pane" id="pane-html"><div class="code-view" id="codeHtml"></div></div>
+                <div class="pane" id="pane-css"><div class="code-view" id="codeCss"></div></div>
+                <div class="pane" id="pane-js"><div class="code-view" id="codeJs"></div></div>
+            </div>
+            <div class="footer-note">
+                📦 Output uses your <span>boilerplate</span>: Bootstrap 5 · GSAP · Lenis · Swiper · PHP includes
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== STATE =====
+let apiKey = localStorage.getItem('dth_apikey') || '';
+let imgBase64 = null;
+let imgType = null;
+let outputFmt = 'boilerplate';
+let activeTab = 'preview';
+let files = { html: '', css: '', js: '' };
+let stepTimer = null;
+
+// ===== INIT =====
+if (apiKey) {
+    document.getElementById('apiKeyInput').value = apiKey;
+    setKeyStatus(true);
+}
+
+// ===== API KEY =====
+function saveKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val.startsWith('sk-ant')) return toast('Invalid key format. Should start with sk-ant-', 'err');
+    apiKey = val;
+    localStorage.setItem('dth_apikey', apiKey);
+    setKeyStatus(true);
+    toast('API key saved!', 'ok');
+    checkGenBtn();
+}
+
+function setKeyStatus(ok) {
+    const el = document.getElementById('keyStatus');
+    el.className = 'key-status ' + (ok ? 'ok' : 'no');
+    el.textContent = ok ? 'Key saved' : 'No key';
+}
+
+// ===== FILE HANDLING =====
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('over');
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+dropZone.addEventListener('click', e => {
+    if (!e.target.classList.contains('browse-btn')) fileInput.click();
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+function loadFile(file) {
+    if (!file.type.startsWith('image/')) return toast('Please upload an image file', 'err');
+    if (file.size > 5 * 1024 * 1024) return toast('Max 5MB image size', 'err');
+    const reader = new FileReader();
+    reader.onload = e => {
+        const res = e.target.result;
+        imgBase64 = res.split(',')[1];
+        imgType = file.type;
+        document.getElementById('previewImg').src = res;
+        const name = file.name.length > 24 ? file.name.slice(0,24)+'…' : file.name;
+        document.getElementById('imgNameLabel').textContent = name;
+        dropZone.style.display = 'none';
+        document.getElementById('imgPreview').style.display = 'block';
+        checkGenBtn();
+    };
+    reader.readAsDataURL(file);
+}
+
+function checkGenBtn() {
+    document.getElementById('genBtn').disabled = !(imgBase64 && apiKey);
+}
+
+// ===== FORMAT SELECT =====
+function selectFmt(el) {
+    document.querySelectorAll('.format-opt').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+    outputFmt = el.dataset.fmt;
+}
+
+// ===== TABS =====
+function switchTab(btn) {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab[data-tab]').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
+    document.getElementById('pane-' + activeTab).classList.add('on');
+}
+
+// ===== COPY =====
+function copyActive() {
+    const code = activeTab === 'css' ? files.css : activeTab === 'js' ? files.js : files.html;
+    if (!code) return toast('Nothing to copy yet', 'err');
+    navigator.clipboard.writeText(code).then(() => toast('Copied!', 'ok')).catch(() => toast('Copy failed', 'err'));
+}
+
+// ===== DOWNLOAD ZIP =====
+async function downloadZip() {
+    if (!files.html) return toast('Generate code first', 'err');
+    const zip = new JSZip();
+    zip.file('index.php', files.html);
+    const css = zip.folder('css');
+    css.file('custom.min.css', files.css);
+    css.file('responsive.css', '/* Add responsive overrides here */\n');
+    const js = zip.folder('js');
+    js.file('custom.min.js', files.js);
+    js.file('email-script.js', '/* Email script */\n');
+    const include = zip.folder('include');
+    include.file('css.php', `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" />\n<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />\n<link rel="stylesheet" href="css/custom.min.css" />\n<link rel="stylesheet" href="css/responsive.css" />`);
+    include.file('js.php', `<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>\n<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"><\/script>\n<script src="https://unpkg.com/lenis@1.1.2/dist/lenis.min.js"><\/script>\n<script src="js/email-script.js"><\/script>\n<script src="js/custom.min.js"><\/script>`);
+    include.file('header.php', `<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title><?php echo isset($title) ? $title : 'Home'; ?></title>\n    <?php include 'include/css.php'; ?>\n</head>\n<body>`);
+    include.file('footer.php', `    <?php include 'include/js.php'; ?>\n</body>\n</html>`);
+    zip.folder('images');
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'design-boilerplate.zip'; a.click();
+    URL.revokeObjectURL(url);
+    toast('ZIP downloaded!', 'ok');
+}
+
+// ===== STEPS ANIMATION =====
+function startSteps() {
+    ['s1','s2','s3','s4','s5'].forEach(id => {
+        document.getElementById(id).className = 'step';
+    });
+    document.getElementById('s1').className = 'step active';
+    document.getElementById('progBar').style.width = '5%';
+    let i = 1;
+    stepTimer = setInterval(() => {
+        document.getElementById('s'+i).className = 'step done';
+        i++;
+        if (i <= 5) {
+            document.getElementById('s'+i).className = 'step active';
+            document.getElementById('progBar').style.width = (i * 19) + '%';
+        }
+        if (i > 5) clearInterval(stepTimer);
+    }, 6000);
+}
+
+// ===== MAIN GENERATE =====
+async function startGenerate() {
+    if (!imgBase64 || !apiKey) return;
+
+    // show loading
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('outputPanel').style.display = 'none';
+    const ls = document.getElementById('loadingState');
+    ls.style.display = 'flex';
+    document.getElementById('genBtn').disabled = true;
+    startSteps();
+
+    try {
+        const result = await callClaude();
+        clearInterval(stepTimer);
+        document.getElementById('progBar').style.width = '100%';
+        ['s1','s2','s3','s4','s5'].forEach(id => document.getElementById(id).className = 'step done');
+
+        setTimeout(() => {
+            ls.style.display = 'none';
+            showOutput(result);
+        }, 500);
+
+    } catch(err) {
+        clearInterval(stepTimer);
+        ls.style.display = 'none';
+        document.getElementById('emptyState').style.display = 'flex';
+        document.getElementById('genBtn').disabled = false;
+        toast('Error: ' + err.message, 'err');
+    }
+}
+
+async function callClaude() {
+    const extra = document.getElementById('extraPrompt').value.trim();
+
+    const boilerplatePrompt = outputFmt === 'boilerplate' ? `
+OUTPUT FORMAT — PHP BOILERPLATE:
+Your output must follow this exact boilerplate structure:
+
+index.php:
+- First line: <?php include 'include/header.php'; ?>
+- Main page content (all sections)
+- Last line: <?php include 'include/footer.php'; ?>
+- Use Bootstrap 5 grid (container, row, col-md-*, col-lg-*)
+- Do NOT include DOCTYPE, html, head, body, script, or link tags
+- Use Font Awesome icons: <i class="fas fa-*"></i>
+- Use Swiper markup for any sliders
+
+css/custom.min.css:
+- All custom CSS goes here
+- Use CSS variables for colors, fonts
+- CSS resets, typography, component styles
+- Hover effects, transitions, animations
+- Mobile responsive media queries
+- Bootstrap variable overrides
+
+js/custom.min.js:
+- Initialize Lenis smooth scroll
+- GSAP + ScrollTrigger animations
+- Swiper initialization if needed
+- Custom interactions visible in design
+- jQuery for any DOM manipulation` 
+    : `OUTPUT FORMAT: Complete standalone HTML file with embedded <style> and <script>.`;
+
+    const prompt = `You are a senior frontend developer. Analyze this design image with extreme precision and convert it to complete, production-ready code.
+
+${boilerplatePrompt}
+
+${extra ? 'EXTRA REQUIREMENTS:\n' + extra : ''}
+
+Analyze the design for:
+- Color palette (exact colors)
+- Typography (font sizes, weights, hierarchy)  
+- Layout structure (grid, flexbox patterns)
+- All sections visible (hero, nav, features, cards, footer, etc.)
+- Spacing and padding patterns
+- Any animations or interactive elements suggested by the design
+- Icons and visual elements
+
+Generate complete, working code that accurately recreates this design. Do not use placeholder lorem ipsum if real text is visible.
+
+Respond ONLY in this exact JSON (no markdown, no backticks, no explanation):
+{"html":"...","css":"...","js":"..."}`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-allow-browser': 'true'
+        },
+        body: JSON.stringify({
+            model: 'claude-opus-4-5',
+            max_tokens: 8000,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'image', source: { type: 'base64', media_type: imgType, data: imgBase64 } },
+                    { type: 'text', text: prompt }
+                ]
+            }]
+        })
+    });
+
+    if (!res.ok) {
+        let errMsg = `API error ${res.status}`;
+        try {
+            const errData = await res.json();
+            errMsg = errData.error?.message || errMsg;
+        } catch(e) {}
+        throw new Error(errMsg);
+    }
+
+    const data = await res.json();
+    const raw = data.content.map(b => b.text || '').join('');
+
+    // Parse JSON from response
+    let parsed;
+    try {
+        // Remove any markdown code fences
+        let clean = raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+        // Find JSON boundaries
+        const start = clean.indexOf('{');
+        const end = clean.lastIndexOf('}') + 1;
+        if (start === -1) throw new Error('No JSON found');
+        parsed = JSON.parse(clean.slice(start, end));
+    } catch(e) {
+        // Fallback regex extraction
+        const htmlM = raw.match(/"html"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const cssM = raw.match(/"css"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const jsM = raw.match(/"js"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+        const unescape = s => s ? s.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\\\/g,'\\') : '';
+        parsed = {
+            html: unescape(htmlM?.[1]) || '<!-- HTML not generated -->',
+            css: unescape(cssM?.[1]) || '/* CSS not generated */',
+            js: unescape(jsM?.[1]) || '// JS not generated'
+        };
+    }
+
+    return parsed;
+}
+
+function showOutput(result) {
+    files = result;
+    document.getElementById('codeHtml').textContent = result.html;
+    document.getElementById('codeCss').textContent = result.css;
+    document.getElementById('codeJs').textContent = result.js;
+
+    // Build preview
+    const previewDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>${result.css}</style>
+</head>
+<body>
+${result.html.replace(/<!--.*?-->/gs,'').replace(/<\?php[^?]*\?>/gs,'').replace(/<\?=.*?\?>/gs,'')}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"><\/script>
+<script src="https://unpkg.com/lenis@1.1.2/dist/lenis.min.js"><\/script>
+<script>${result.js}<\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([previewDoc], { type: 'text/html' });
+    document.getElementById('preview').src = URL.createObjectURL(blob);
+
+    document.getElementById('outputPanel').style.display = 'flex';
+    document.getElementById('genBtn').disabled = false;
+
+    // Reset to preview tab
+    document.querySelectorAll('.tab[data-tab]').forEach(b => b.classList.remove('on'));
+    document.querySelector('.tab[data-tab="preview"]').classList.add('on');
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
+    document.getElementById('pane-preview').classList.add('on');
+    activeTab = 'preview';
+
+    toast('Code generated! 🎉', 'ok');
+}
+
+// ===== TOAST =====
+function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.className = 'toast ' + type;
+    el.textContent = msg;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ===== ALSO allow pressing Enter in API key field =====
+document.getElementById('apiKeyInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveKey();
+});
+</script>
+</body>
+</html>

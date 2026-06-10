@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design to HTML — AI Converter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e;
+    --bg2: #141416;
+    --bg3: #1c1c1f;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f0;
+    --text2: #888;
+    --accent: #7c6af7;
+    --accent2: #a78bf7;
+    --success: #3ecf8e;
+    --error: #f87171;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 32px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-left h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-left p { font-size: 13px; color: var(--text2); margin-top: 3px; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(124,106,247,0.12);
+    border: 1px solid rgba(124,106,247,0.25);
+    color: var(--accent2);
+    font-family: var(--mono);
+  }
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    min-height: calc(100vh - 89px);
+  }
+
+  /* LEFT PANEL */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* DROP ZONE */
+  .drop-zone {
+    border: 2px dashed var(--border2);
+    border-radius: 14px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg2);
+    position: relative;
+    overflow: hidden;
+  }
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(124,106,247,0.06), transparent 70%);
+    pointer-events: none;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.05);
+  }
+  .drop-zone.dragover { transform: scale(1.01); }
+  .drop-icon {
+    width: 48px; height: 48px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+    font-size: 22px;
+  }
+  .drop-zone h3 { font-size: 15px; font-weight: 500; margin-bottom: 5px; }
+  .drop-zone p { font-size: 12px; color: var(--text2); }
+  .browse-btn {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 7px 18px;
+    background: var(--accent);
+    color: white;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .browse-btn:hover { background: var(--accent2); }
+  #fileInput { display: none; }
+
+  /* IMAGE PREVIEW THUMB */
+  .img-thumb {
+    display: none;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border2);
+    position: relative;
+  }
+  .img-thumb img { width: 100%; height: 180px; object-fit: cover; display: block; }
+  .img-thumb-overlay {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(0,0,0,0.6);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .img-change {
+    position: absolute;
+    bottom: 8px; left: 8px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .img-change:hover { background: rgba(255,255,255,0.1); }
+
+  /* OPTIONS */
+  .options-section label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 8px;
+  }
+  .textarea-custom {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: var(--sans);
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .textarea-custom:focus { border-color: var(--accent); }
+  .textarea-custom::placeholder { color: var(--text2); }
+
+  /* CONVERT BTN */
+  .convert-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--sans);
+    letter-spacing: 0.2px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .convert-btn:hover:not(:disabled) { background: var(--accent2); transform: translateY(-1px); }
+  .convert-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text2);
+    gap: 10px;
+    padding: 40px;
+  }
+  .empty-icon {
+    width: 64px; height: 64px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 4px;
+  }
+  .empty-state p { font-size: 13px; }
+
+  /* LOADING */
+  .loading-state {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px;
+  }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-state h3 { font-size: 15px; font-weight: 500; }
+  .loading-state p { font-size: 13px; color: var(--text2); text-align: center; }
+  .progress-wrap {
+    width: 280px;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+  .loading-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 280px;
+  }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text2);
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+  .step-item.active { opacity: 1; color: var(--text); }
+  .step-item.done { opacity: 1; color: var(--success); }
+  .step-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border2);
+    flex-shrink: 0;
+  }
+  .step-item.active .step-dot { background: var(--accent); }
+  .step-item.done .step-dot { background: var(--success); }
+
+  /* OUTPUT PANEL */
+  .output-panel {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  /* TABS */
+  .tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    font-family: var(--sans);
+    transition: all 0.15s;
+    background: transparent;
+    color: var(--text2);
+  }
+  .tab-btn:hover { background: var(--bg3); color: var(--text); }
+  .tab-btn.active { background: var(--accent); color: white; }
+  .tab-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .action-btn:hover { border-color: var(--border2); color: var(--text); }
+  .action-btn.primary { background: var(--accent); color: white; border-color: transparent; }
+  .action-btn.primary:hover { background: var(--accent2); }
+
+  /* TAB CONTENT */
+  .tab-content { flex: 1; overflow: auto; }
+  .tab-pane { display: none; height: 100%; }
+  .tab-pane.active { display: block; }
+
+  iframe#livePreview {
+    width: 100%;
+    height: 100%;
+    min-height: 520px;
+    border: none;
+    background: white;
+    display: block;
+  }
+
+  .code-block {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #c9d1d9;
+    background: var(--bg);
+    padding: 24px;
+    overflow: auto;
+    height: 100%;
+    min-height: 520px;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  /* BOILERPLATE STRUCTURE PANEL */
+  .boilerplate-note {
+    padding: 14px 20px;
+    background: rgba(124,106,247,0.06);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .boilerplate-note strong { color: var(--accent2); }
+
+  /* ERROR */
+  .error-toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: #2a1a1a;
+    border: 1px solid rgba(248,113,113,0.3);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 13px;
+    color: var(--error);
+    max-width: 340px;
+    display: none;
+    z-index: 100;
+    animation: slideUp 0.3s ease;
+  }
+  .success-toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: #0a1f16;
+    border: 1px solid rgba(62,207,142,0.3);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 13px;
+    color: var(--success);
+    max-width: 340px;
+    display: none;
+    z-index: 100;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @media (max-width: 760px) {
+    .main { grid-template-columns: 1fr; }
+    .left-panel { border-right: none; border-bottom: 1px solid var(--border); }
+    .header { padding: 20px; }
+    .header-left h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Design → HTML Converter</h1>
+    <p>Upload any design screenshot — get production-ready PHP/HTML code</p>
+  </div>
+  <div class="badge">Claude Vision API</div>
+</div>
+
+<div class="main">
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- Drop Zone -->
+    <div id="dropZone" class="drop-zone">
+      <div class="drop-icon">🖼️</div>
+      <h3>Drop design image here</h3>
+      <p>PNG, JPG, WEBP — up to 5MB</p>
+      <button class="browse-btn" onclick="document.getElementById('fileInput').click()">Browse File</button>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <!-- Image Thumb -->
+    <div id="imgThumb" class="img-thumb">
+      <img id="thumbImg" src="" alt="Design preview">
+      <span class="img-thumb-overlay" id="imgName"></span>
+      <button class="img-change" onclick="document.getElementById('fileInput').click()">↺ Change</button>
+    </div>
+
+    <!-- Options -->
+    <div class="options-section">
+      <label>Additional Instructions (optional)</label>
+      <textarea id="customPrompt" class="textarea-custom" placeholder="e.g. Use Bootstrap 5 grid, make it responsive, dark theme, add hover animations..."></textarea>
+    </div>
+
+    <button id="convertBtn" class="convert-btn" disabled>
+      ✦ Generate HTML Code
+    </button>
+
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel" id="rightPanel">
+
+    <!-- Empty -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">⚡</div>
+      <h3 style="font-size:15px; font-weight:500; color: var(--text);">Ready to convert</h3>
+      <p>Upload a design image on the left and hit Generate</p>
+      <p style="font-size:11px; margin-top:4px; color: rgba(136,136,136,0.6);">Claude Vision analyzes the design and writes real HTML</p>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <h3>Analyzing your design…</h3>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="loading-steps">
+        <div class="step-item active" id="step1"><div class="step-dot"></div>Sending image to Claude Vision</div>
+        <div class="step-item" id="step2"><div class="step-dot"></div>Identifying layout & components</div>
+        <div class="step-item" id="step3"><div class="step-dot"></div>Generating HTML structure</div>
+        <div class="step-item" id="step4"><div class="step-dot"></div>Writing CSS styles</div>
+        <div class="step-item" id="step5"><div class="step-dot"></div>Formatting boilerplate output</div>
+      </div>
+      <p id="loadingMsg">Please wait, this takes 15–30 seconds…</p>
+    </div>
+
+    <!-- Output -->
+    <div class="output-panel" id="outputPanel">
+      <div class="tabs-bar">
+        <button class="tab-btn active" data-tab="preview">👁 Live Preview</button>
+        <button class="tab-btn" data-tab="html">index.php</button>
+        <button class="tab-btn" data-tab="css">custom.css</button>
+        <button class="tab-btn" data-tab="js">custom.js</button>
+        <div class="tab-actions">
+          <button class="action-btn" id="copyBtn">⊕ Copy</button>
+          <button class="action-btn primary" id="downloadBtn">↓ Download ZIP</button>
+        </div>
+      </div>
+      <div class="tab-content" id="tabContent">
+        <div class="tab-pane active" id="tab-preview">
+          <iframe id="livePreview"></iframe>
+        </div>
+        <div class="tab-pane" id="tab-html">
+          <div class="code-block" id="codeHtml"></div>
+        </div>
+        <div class="tab-pane" id="tab-css">
+          <div class="code-block" id="codeCss"></div>
+        </div>
+        <div class="tab-pane" id="tab-js">
+          <div class="code-block" id="codeJs"></div>
+        </div>
+      </div>
+      <div class="boilerplate-note">
+        <span>📦</span>
+        <span>Output follows your <strong>boilerplate structure</strong>: Bootstrap 5 + GSAP + Lenis + Swiper. PHP includes (header.php, footer.php, css.php, js.php) preserved.</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="error-toast" id="errorToast"></div>
+<div class="success-toast" id="successToast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+let currentImageBase64 = null;
+let currentImageType = null;
+let generatedFiles = { html: '', css: '', js: '' };
+let activeTab = 'preview';
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const convertBtn = document.getElementById('convertBtn');
+const imgThumb = document.getElementById('imgThumb');
+const thumbImg = document.getElementById('thumbImg');
+const imgName = document.getElementById('imgName');
+
+// DRAG & DROP
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+dropZone.addEventListener('click', e => { if (!e.target.classList.contains('browse-btn')) fileInput.click(); });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) return showError('Please upload an image file (PNG, JPG, WEBP)');
+  if (file.size > 5 * 1024 * 1024) return showError('Image must be under 5MB');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = e.target.result;
+    currentImageBase64 = result.split(',')[1];
+    currentImageType = file.type;
+    thumbImg.src = result;
+    imgName.textContent = file.name.length > 20 ? file.name.slice(0,20)+'…' : file.name;
+    dropZone.style.display = 'none';
+    imgThumb.style.display = 'block';
+    convertBtn.disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+// TABS
+document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + activeTab).classList.add('active');
+  });
+});
+
+// STEPS ANIMATION
+let stepTimer;
+function animateSteps() {
+  const steps = [1,2,3,4,5];
+  let i = 0;
+  const bar = document.getElementById('progressBar');
+  bar.style.width = '8%';
+  stepTimer = setInterval(() => {
+    if (i > 0) {
+      document.getElementById('step'+i).className = 'step-item done';
+    }
+    i++;
+    if (i <= steps.length) {
+      document.getElementById('step'+i).className = 'step-item active';
+      bar.style.width = (i * 18) + '%';
+    }
+    if (i >= steps.length) clearInterval(stepTimer);
+  }, 5000);
+}
+
+// CONVERT
+convertBtn.addEventListener('click', async () => {
+  if (!currentImageBase64) return;
+
+  const customPrompt = document.getElementById('customPrompt').value.trim();
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('outputPanel').style.display = 'none';
+  const ls = document.getElementById('loadingState');
+  ls.style.display = 'flex';
+  convertBtn.disabled = true;
+  [1,2,3,4,5].forEach(n => document.getElementById('step'+n).className = 'step-item');
+  document.getElementById('step1').className = 'step-item active';
+  document.getElementById('progressBar').style.width = '0%';
+  animateSteps();
+
+  try {
+    const result = await callClaudeVision(currentImageBase64, currentImageType, customPrompt);
+    clearInterval(stepTimer);
+    document.getElementById('progressBar').style.width = '100%';
+    [1,2,3,4,5].forEach(n => document.getElementById('step'+n).className = 'step-item done');
+
+    setTimeout(() => {
+      ls.style.display = 'none';
+      displayResults(result);
+    }, 600);
+  } catch(err) {
+    clearInterval(stepTimer);
+    ls.style.display = 'none';
+    document.getElementById('emptyState').style.display = 'flex';
+    convertBtn.disabled = false;
+    showError('Error: ' + err.message);
+  }
+});
+
+async function callClaudeVision(base64, mediaType, extraInstructions) {
+  const boilerplateContext = `
+BOILERPLATE STRUCTURE (must follow this exactly):
+- index.php: PHP file with <?php include 'include/header.php'; ?> at top and <?php include 'include/footer.php'; ?> at bottom
+- css/custom.min.css: All CSS styles
+- js/custom.min.js: All JavaScript
+- include/css.php already includes: Bootstrap 5.3, Swiper 11, Font Awesome 6.4, custom.min.css, responsive.css
+- include/js.php already includes: jQuery 3.7, jQuery UI, jQuery Validate, Popper, Bootstrap 5.3 JS, Swiper 11, GSAP 3.12.5, ScrollTrigger, TextPlugin, EasePack, SplitType 0.3.4, Lenis 1.1.2, email-script.js, custom.min.js
+- Header has .header class with Bootstrap navbar. Footer has .footer class.
+- Use Bootstrap 5 grid (container, row, col-*) for layout
+- Do NOT include any CDN links in the PHP file since they're in includes
+- Do NOT write DOCTYPE/html/head/body in index.php since header.php and footer.php handle that`;
+
+  const prompt = `You are an expert frontend developer. Analyze this design image carefully and convert it to clean, production-ready code.
+
+${boilerplateContext}
+
+${extraInstructions ? 'EXTRA REQUIREMENTS: ' + extraInstructions : ''}
+
+Generate THREE separate code blocks:
+
+1. HTML (index.php content — only the main content between header and footer includes):
+- Start with: <?php include 'include/header.php'; ?>
+- End with: <?php include 'include/footer.php'; ?>
+- Use Bootstrap 5 classes for grid/layout
+- Recreate all visible sections: hero, features, cards, nav items, etc.
+- Use Font Awesome icons where appropriate (fas fa-*, fab fa-*)
+- Use semantic HTML5 elements
+- Add Swiper markup if there are sliders/carousels
+- Make it fully responsive
+
+2. CSS (for css/custom.min.css):
+- Custom styles that complement Bootstrap
+- CSS variables for colors/fonts
+- Hover effects, transitions, animations
+- Mobile responsive overrides
+- Match the color scheme exactly from the design
+
+3. JS (for js/custom.min.js):
+- GSAP animations with ScrollTrigger if design has animation hints
+- Lenis smooth scroll initialization
+- Swiper initialization if needed
+- Any interactive behavior visible in design
+
+Respond ONLY in this exact JSON format with no extra text:
+{
+  "html": "...full index.php content...",
+  "css": "...full CSS...",
+  "js": "...full JS..."
+}`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8000,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: base64
+            }
+          },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.content.map(b => b.text || '').join('');
+
+  let parsed;
+  try {
+    const clean = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const jsonStart = clean.indexOf('{');
+    const jsonEnd = clean.lastIndexOf('}') + 1;
+    parsed = JSON.parse(clean.slice(jsonStart, jsonEnd));
+  } catch(e) {
+    // Fallback: try to extract manually
+    const htmlMatch = text.match(/"html"\s*:\s*"([\s\S]*?)(?:",\s*"css"|"\s*})/);
+    const cssMatch = text.match(/"css"\s*:\s*"([\s\S]*?)(?:",\s*"js"|"\s*})/);
+    const jsMatch = text.match(/"js"\s*:\s*"([\s\S]*?)(?:"\s*})/);
+    parsed = {
+      html: htmlMatch ? htmlMatch[1].replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\\"/g,'"') : '<!-- HTML generation failed -->',
+      css: cssMatch ? cssMatch[1].replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\\"/g,'"') : '/* CSS generation failed */',
+      js: jsMatch ? jsMatch[1].replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\\"/g,'"') : '// JS generation failed'
+    };
+  }
+
+  return parsed;
+}
+
+function buildPreviewHTML(html, css, js) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>${css}</style>
+</head>
+<body>
+${html.replace(/<!--.*?-->/gs, '').replace(/<\?php.*?\?>/gs, '')}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"><\/script>
+<script src="https://unpkg.com/lenis@1.1.2/dist/lenis.min.js"><\/script>
+<script>${js}<\/script>
+</body>
+</html>`;
+}
+
+function displayResults(result) {
+  generatedFiles = result;
+
+  document.getElementById('codeHtml').textContent = result.html;
+  document.getElementById('codeCss').textContent = result.css;
+  document.getElementById('codeJs').textContent = result.js;
+
+  const previewHTML = buildPreviewHTML(result.html, result.css, result.js);
+  const blob = new Blob([previewHTML], { type: 'text/html' });
+  const blobUrl = URL.createObjectURL(blob);
+  document.getElementById('livePreview').src = blobUrl;
+
+  document.getElementById('outputPanel').style.display = 'flex';
+  convertBtn.disabled = false;
+  showSuccess('Code generated successfully!');
+}
+
+// COPY
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const code = activeTab === 'css' ? generatedFiles.css
+    : activeTab === 'js' ? generatedFiles.js
+    : generatedFiles.html;
+  navigator.clipboard.writeText(code).then(() => showSuccess('Copied to clipboard!')).catch(() => showError('Copy failed'));
+});
+
+// DOWNLOAD ZIP
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  if (!generatedFiles.html) return showError('Generate code first');
+  const zip = new JSZip();
+  zip.file('index.php', generatedFiles.html);
+  zip.folder('css').file('custom.min.css', generatedFiles.css);
+  zip.folder('js').file('custom.min.js', generatedFiles.js);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'generated-design.zip'; a.click();
+  URL.revokeObjectURL(url);
+  showSuccess('ZIP downloaded!');
+});
+
+function showError(msg) {
+  const el = document.getElementById('errorToast');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function showSuccess(msg) {
+  const el = document.getElementById('successToast');
+  el.textContent = '✓ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+</script>
+</body>
+</html>
